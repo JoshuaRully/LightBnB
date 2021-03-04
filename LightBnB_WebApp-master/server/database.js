@@ -18,12 +18,12 @@ const pool = new Pool ({
  * @return {Promise<{}>} A promise to the user.
  */
 const getUserWithEmail = function(email) {
-  const queryString = `
+  const queryStr = `
     SELECT users.*
       FROM users 
       WHERE email = $1
   `;
-  return pool.query(queryString, [email])
+  return pool.query(queryStr, [email])
     .then(res => res.rows[0])
     .catch(err => console.log(err.stack));
 }
@@ -35,30 +35,29 @@ exports.getUserWithEmail = getUserWithEmail;
  * @return {Promise<{}>} A promise to the user.
  */
 const getUserWithId = function(id) {
-  const queryString = `
+  const queryStr = `
   SELECT users.*
     FROM users 
     WHERE id = $1
 `;
-return pool.query(queryString, [id])
+return pool.query(queryStr, [id])
   .then(res => res.rows[0])
   .catch(err => console.log(err.stack));
 }
 exports.getUserWithId = getUserWithId;
-
 
 /**
  * Add a new user to the database.
  * @param {{name: string, password: string, email: string}} user
  * @return {Promise<{}>} A promise to the user.
  */
-const addUser =  function(user) {
-  const queryString = `
+const addUser = function(user) {
+  const queryStr = `
     INSERT INTO users (name, email, password)
       VALUES ($1, $2, $3)
       RETURNING *;
   `;
-  return pool.query(queryString, [user.name, user.email, user.password])
+  return pool.query(queryStr, [user.name, user.email, user.password])
     .then(res => res.rows[0])
     .catch(err => console.log(err.stack));
 }
@@ -72,7 +71,7 @@ exports.addUser = addUser;
  * @return {Promise<[{}]>} A promise to the reservations.
  */
 const getAllReservations = function(guest_id, limit = 10) {
-  const queryString = `
+  const queryStr = `
   SELECT properties.*, res.*, avg(rating) AS average_rating 
     FROM properties
     JOIN property_reviews AS reviews
@@ -87,7 +86,7 @@ const getAllReservations = function(guest_id, limit = 10) {
     ORDER BY start_date
     LIMIT $2
   `;
-  return pool.query(queryString, [guest_id, limit])
+  return pool.query(queryStr, [guest_id, limit])
     .then(res => res.rows)
     .catch(err => console.log(err.stack));
 }
@@ -102,7 +101,7 @@ exports.getAllReservations = getAllReservations;
  * @return {Promise<[{}]>}  A promise to the properties.
  */
 const getAllProperties = function(options, limit = 10) {
-  queryParams = [];
+  const queryParams = [];
   let queryStr = `
   SELECT properties.*, avg(property_reviews.rating) AS average_rating
     FROM properties
@@ -130,13 +129,12 @@ const getAllProperties = function(options, limit = 10) {
   queryParams.push(limit);
   queryStr +=  `ORDER BY cost_per_night
   LIMIT $${queryParams.length};
-`;
+  `;
   return pool.query(queryStr, queryParams)
     .then(res => res.rows)
     .catch(err => err.stack);
 };
 exports.getAllProperties = getAllProperties;
-
 
 /**
  * Add a property to the database
@@ -144,9 +142,29 @@ exports.getAllProperties = getAllProperties;
  * @return {Promise<{}>} A promise to the property.
  */
 const addProperty = function(property) {
-  const propertyId = Object.keys(properties).length + 1;
-  property.id = propertyId;
-  properties[propertyId] = property;
-  return Promise.resolve(property);
+  let attrStr = '';
+  let costStr = '';
+  let propertyValues = [];
+  for (let [key, value] of Object.entries(property)) {
+    if (value && key !== 'owner_id') {
+      attrStr += (key + ', ');
+      propertyValues.push(value);
+    } else if (value) {
+      attrStr += key;
+      propertyValues.push(value);
+    } else attrStr += '';
+  }
+  propertyValues.forEach((e, index) => {
+    if (index !== propertyValues.length - 1) costStr += (`$${index + 1} ,`);
+    else costStr += `$${index + 1}`;
+  });
+  const queryStr = `
+    INSERT INTO properties (${attrStr})
+    VALUES (${costStr})
+    RETURNING *;
+  `;
+  return pool.query(queryStr, propertyValues)
+    .then(res => res.rows)
+    .catch(err => console.log(err));
 }
 exports.addProperty = addProperty;
